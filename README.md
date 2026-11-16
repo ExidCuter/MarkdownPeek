@@ -21,6 +21,9 @@ Quick Look for Markdown on macOS. Select a `.md` file in Finder and press **Spac
 
 1. Download `MarkdownPeek-<version>.dmg` from [Releases](https://github.com/ExidCuter/MarkdownPeek/releases).
 2. Open it and drag **MarkdownPeek** into **Applications**.
+
+   <img src="docs/screenshots/installer.png" width="450" alt="MarkdownPeek installer window: drag the app onto the Applications folder">
+
 3. Open MarkdownPeek from Applications. This registers the Quick Look extensions, and the window shows both as **Active**.
 4. Select a Markdown file in Finder and press Space.
 
