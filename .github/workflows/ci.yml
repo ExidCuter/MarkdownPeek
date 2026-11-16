@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: No signing team committed
+        run: |
+          # Choosing a team in Xcode's Signing tab writes it into project.pbxproj.
+          # Teams belong in the git-ignored Config/Local.xcconfig instead.
+          if grep -nE 'DEVELOPMENT_TEAM[^;]*= *"?[A-Z0-9]{10}' \
+              MarkdownPeek.xcodeproj/project.pbxproj Config/Signing.xcconfig; then
+            echo "::error::A DEVELOPMENT_TEAM is committed. Clear it in Xcode's Signing tab and put it in Config/Local.xcconfig."
+            exit 1
+          fi
+
+      - name: Build and test (unsigned)
+        run: |
+          xcodebuild -project MarkdownPeek.xcodeproj -scheme MarkdownPeek \
+            -destination 'platform=macOS' -derivedDataPath build/DerivedData \
+            CODE_SIGNING_ALLOWED=NO test
