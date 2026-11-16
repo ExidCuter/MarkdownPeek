@@ -5,3 +5,4 @@ xcuserdata/
 *.xcresult
 # Personal signing identity (see Config/Local.xcconfig.example)
 Config/Local.xcconfig
+dist/

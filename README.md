@@ -19,45 +19,31 @@ Quick Look for Markdown on macOS. Select a `.md` file in Finder and press **Spac
 
 ## Install
 
-Requirements: macOS 14 or later and Xcode 16 or later.
+1. Download `MarkdownPeek-<version>.dmg` from [Releases](https://github.com/ExidCuter/MarkdownPeek/releases).
+2. Open it and drag **MarkdownPeek** into **Applications**.
+3. Open MarkdownPeek from Applications. This registers the Quick Look extensions, and the window shows both as **Active**.
+4. Select a Markdown file in Finder and press Space.
 
-```bash
-git clone https://github.com/<you>/markdownpeek.git && cd markdownpeek
-```
+Requires macOS 14 or later.
 
-```bash
-./scripts/install.sh
-```
+**"Apple could not verify MarkdownPeek…"** Releases aren't notarized by Apple (that needs a paid developer account), so macOS blocks the first launch. Open *System Settings › Privacy & Security*, scroll to the message about MarkdownPeek, click **Open Anyway** and confirm. You only need to do this once.
 
-The script:
-1. builds a Release copy,
-2. installs it to `~/Applications/MarkdownPeek.app`,
-3. registers both Quick Look extensions.
-
-Then select a Markdown file in Finder and press Space. Re-run the script after pulling changes.
-
-### Code signing
-
-Quick Look extensions must be signed. On first run, `install.sh` finds the **Apple Development** certificate in your keychain and writes your team ID to `Config/Local.xcconfig`. Git ignores that file, so your team ID never ends up in the repository.
-
-- **No certificate yet?** A free Apple ID is enough. In Xcode, open *Settings › Accounts*, add your Apple ID, then choose *Manage Certificates… › + › Apple Development*. Run the script again.
-- **Several teams?** Choose one with `TEAM_ID=ABCDE12345 ./scripts/install.sh`, or edit `Config/Local.xcconfig` (see `Config/Local.xcconfig.example`).
-- **Without any certificate**, the build is ad-hoc signed. It compiles, but macOS may refuse to load the extensions.
-- **Don't pick a team in Xcode's *Signing & Capabilities* tab.** Xcode writes that choice into `project.pbxproj`, which is committed, and CI rejects any commit that contains a team ID. `Config/Local.xcconfig` is the place for it.
-
-## Troubleshooting
-
-- **Finder still shows plain text.** Open *System Settings › General › Login Items & Extensions › Quick Look* and make sure MarkdownPeek is on. Then relaunch Finder (Option-right-click the Finder icon in the Dock › Relaunch).
-- **Thumbnails are still plain text.** The system thumbnail agent caches its list of extensions. Log out and back in, or run `killall -9 com.apple.quicklook.ThumbnailsAgent` (it restarts on demand), then `qlmanage -r cache`.
-- **Check registration:** `pluginkit -m -v -i com.markdownpeek.MarkdownPeek.Preview` should print a line starting with `+`.
-- **Test without Finder:** `qlmanage -p file.md` opens a preview. `qlmanage -t -x -s 512 -o /tmp file.md` writes a thumbnail.
-- **Logs:** `log stream --level info --predicate 'subsystem == "com.markdownpeek"'`.
+**Updating:** replace the app in Applications and open it once. Quick Look always uses the copy of MarkdownPeek you opened most recently. Opening a copy registers its extensions and unregisters any other copies.
 
 ## Uninstall
 
-```bash
-/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -u ~/Applications/MarkdownPeek.app && rm -rf ~/Applications/MarkdownPeek.app && defaults delete com.markdownpeek.MarkdownPeek
-```
+1. Open MarkdownPeek and click **Remove Quick Look Extensions…** under *Danger Zone*.
+2. Quit MarkdownPeek and move it to the Trash.
+
+To script it, run `/Applications/MarkdownPeek.app/Contents/MacOS/MarkdownPeek --remove-extensions`. To also delete the settings, run `defaults delete com.markdownpeek.MarkdownPeek`.
+
+## Troubleshooting
+
+- **Finder still shows plain text.** Open MarkdownPeek and check the status of both extensions. If either isn't Active, click **Register Again**; this also clears Quick Look's caches. If an extension shows as turned off, enable it in *System Settings › General › Login Items & Extensions › Quick Look*.
+- **"Another copy" status.** A different copy of MarkdownPeek (an older version or an Xcode build) is registered. Click **Register Again** to switch to this one.
+- **Check from Terminal:** `pluginkit -m -v -i com.markdownpeek.MarkdownPeek.Preview` should print a line starting with `+`.
+- **Test without Finder:** `qlmanage -p file.md` opens a preview. `qlmanage -t -x -s 512 -o /tmp file.md` writes a thumbnail.
+- **Logs:** `log stream --level info --predicate 'subsystem == "com.markdownpeek"'`.
 
 ## How it works
 
@@ -95,7 +81,7 @@ Shared/              renderer, HTML template, settings; Resources/ holds JS and 
 Tests/               renderer unit tests
 Samples/             sample.md, used by the tests and the settings preview
 Config/              signing xcconfig (Local.xcconfig is yours, git-ignored)
-scripts/             install, asset download, icon generation
+scripts/             DMG build, asset download, icon generation
 ```
 
 Open `MarkdownPeek.xcodeproj` in Xcode and run the **MarkdownPeek** scheme (⌘R for the app, ⌘U for tests). To run the tests from the command line:
@@ -105,10 +91,21 @@ xcodebuild -project MarkdownPeek.xcodeproj -scheme MarkdownPeek -destination 'pl
 ```
 
 - The project uses **synchronized folders** (Xcode 16+). A file added to `App/`, `Shared/`, `PreviewExtension/`, `ThumbnailExtension/`, or `Tests/` joins its target(s) automatically, with no project-file edit. `Shared/` belongs to all four targets.
-- The extensions see your code changes only after `./scripts/install.sh`. Running from Xcode only launches the settings app.
+- Running the app from Xcode (⌘R) registers that build's extensions, so ⌘R is all you need to try extension changes. The next time you open the installed copy, it takes over again.
+- **Signing:** builds are ad-hoc signed by default, which is all Quick Look needs on your own Mac. To use your own identity, copy `Config/Local.xcconfig.example` to `Config/Local.xcconfig` (git-ignored). Don't pick a team in Xcode's *Signing & Capabilities* tab: Xcode writes it into the committed `project.pbxproj`, and CI rejects commits that contain a team ID.
 - CI (`.github/workflows/ci.yml`) runs the unit tests unsigned on every push and pull request, and fails if a team ID is committed.
 - `scripts/fetch-assets.sh` re-downloads the pinned highlight.js (11.11.1) and github-markdown-css (5.8.1) files.
 - `scripts/make-icon.swift` regenerates the app icon.
+
+## Releasing
+
+1. Set the version in Xcode (target › General › Version). All targets read it from `MARKETING_VERSION`.
+2. Run `./scripts/make-dmg.sh`. It builds a universal (Apple silicon + Intel) Release, ad-hoc signed so no team ID or name is embedded, and writes `dist/MarkdownPeek-<version>.dmg`.
+   - The installer window (background, arrow, icon positions) comes from `scripts/dmg/`. The layout is written by [dmgbuild](https://github.com/dmgbuild/dmgbuild), which the script installs into `build/` on first run.
+   - Needs Python 3.10 or later (`brew install python`); macOS's built-in Python is too old.
+3. Run `gh release create v<version> dist/MarkdownPeek-<version>.dmg`.
+
+With a paid Apple Developer account, set `DEVELOPER_ID="Developer ID Application: Name (TEAMID)"` and `NOTARY_PROFILE=<notarytool profile>`. The DMG is then signed and notarized, and users don't see the Gatekeeper prompt.
 
 ## License
 

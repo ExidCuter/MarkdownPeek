@@ -15,5 +15,26 @@ struct MarkdownPeekApp: App {
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        let manager = ExtensionManager.shared
+        let args = CommandLine.arguments
+
+        // Scriptable: `MarkdownPeek.app/Contents/MacOS/MarkdownPeek --remove-extensions`
+        if args.contains("--remove-extensions") || args.contains("--register-extensions") {
+            Task {
+                if args.contains("--remove-extensions") {
+                    await manager.remove()
+                } else {
+                    await manager.register()
+                }
+                NSApp.terminate(nil)
+            }
+            return
+        }
+
+        // Opening the app is the install step: it registers the Quick Look extensions.
+        Task { await manager.appDidLaunch() }
+    }
+
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 }

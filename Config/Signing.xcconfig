@@ -1,10 +1,9 @@
 // Code-signing defaults shared by every target.
 //
-// Out of the box the build is ad-hoc signed ("Sign to Run Locally"), so the
-// repository carries no team ID. Put your own signing identity in
-// Config/Local.xcconfig (git-ignored). scripts/install.sh creates that file
-// for you from the "Apple Development" certificate in your keychain; see
-// Config/Local.xcconfig.example to write it by hand.
+// Builds are ad-hoc signed ("Sign to Run Locally") by default, which is all
+// Quick Look needs on your own Mac, and keeps team IDs out of the repository.
+// To sign with your own identity instead, copy Config/Local.xcconfig.example
+// to Config/Local.xcconfig (git-ignored).
 
 CODE_SIGN_STYLE = Manual
 CODE_SIGN_IDENTITY = -

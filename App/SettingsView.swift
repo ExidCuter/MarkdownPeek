@@ -11,6 +11,9 @@ struct SettingsView: View {
     @AppStorage(Keys.showFrontMatter, store: store) private var showFrontMatter = PreviewSettings.default.showFrontMatter
     @AppStorage(Keys.highlightCode, store: store) private var highlightCode = PreviewSettings.default.highlightCode
 
+    @ObservedObject private var extensions = ExtensionManager.shared
+    @State private var confirmingRemoval = false
+
     private var settings: PreviewSettings {
         PreviewSettings(theme: theme, fontSize: fontSize, contentWidth: contentWidth,
                         showFrontMatter: showFrontMatter, highlightCode: highlightCode)
@@ -19,13 +22,7 @@ struct SettingsView: View {
     var body: some View {
         HSplitView {
             Form {
-                Section("Quick Look") {
-                    Label("Select a Markdown file in Finder and press Space.", systemImage: "eye")
-                    Text("If Finder still shows plain text, turn on MarkdownPeek under System Settings › General › Login Items & Extensions › Quick Look.")
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                    Button("Open Extension Settings…", action: openExtensionSettings)
-                }
+                quickLookSection
 
                 Section("Appearance") {
                     Picker("Theme", selection: $theme) {
@@ -59,12 +56,99 @@ struct SettingsView: View {
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
+
+                dangerSection
             }
             .formStyle(.grouped)
+            .confirmationDialog("Remove the Quick Look extensions?", isPresented: $confirmingRemoval) {
+                Button("Remove Extensions", role: .destructive) {
+                    Task { await extensions.remove() }
+                }
+            } message: {
+                Text("Finder goes back to showing Markdown files as plain text. You can turn the extensions back on here at any time. To uninstall completely, remove the extensions, then quit and move MarkdownPeek to the Trash.")
+            }
             .frame(minWidth: 320, idealWidth: 350, maxWidth: 420)
 
             SamplePreview(settings: settings)
                 .frame(minWidth: 480)
+        }
+    }
+
+    // MARK: Quick Look status
+
+    @ViewBuilder
+    private var quickLookSection: some View {
+        Section("Quick Look") {
+            if !extensions.isInStableLocation {
+                Label {
+                    Text("Move MarkdownPeek to your Applications folder and open it from there. Extensions registered from a disk image or Downloads stop working once that copy goes away.")
+                } icon: {
+                    Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.yellow)
+                }
+            }
+
+            ForEach(ExtensionManager.extensions) { ext in
+                LabeledContent(ext.name) {
+                    statusBadge(extensions.states[ext.id] ?? .checking)
+                }
+            }
+
+            if extensions.allActive {
+                Label("Select a Markdown file in Finder and press Space.", systemImage: "eye")
+            } else if extensions.userRemoved {
+                Text("The extensions were removed. Turn them on again to get rendered previews.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+
+            HStack {
+                Button(extensions.allActive ? "Register Again" : "Turn On Extensions") {
+                    Task { await extensions.register() }
+                }
+                .disabled(extensions.isWorking)
+                Button("Open Extension Settings…", action: openExtensionSettings)
+                if extensions.isWorking {
+                    ProgressView().controlSize(.small)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func statusBadge(_ state: ExtensionManager.State) -> some View {
+        switch state {
+        case .checking:
+            Text("Checking…").foregroundStyle(.secondary)
+        case .active:
+            Label("Active", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+        case .disabled:
+            Label(extensions.userRemoved ? "Removed" : "Turned off", systemImage: "minus.circle.fill")
+                .foregroundStyle(.secondary)
+        case .otherCopy(let path):
+            Label("Another copy", systemImage: "exclamationmark.circle.fill")
+                .foregroundStyle(.orange)
+                .help("Quick Look is using \(path)")
+        case .notRegistered:
+            Label(extensions.userRemoved ? "Removed" : "Not registered", systemImage: "xmark.circle.fill")
+                .foregroundStyle(extensions.userRemoved ? .secondary : Color.red)
+        }
+    }
+
+    // MARK: Danger zone
+
+    private var dangerSection: some View {
+        Section {
+            Button("Remove Quick Look Extensions…", role: .destructive) {
+                confirmingRemoval = true
+            }
+            .foregroundStyle(.red)
+            .disabled(extensions.isWorking || extensions.userRemoved)
+        } header: {
+            Text("Danger Zone").foregroundStyle(.red)
+        } footer: {
+            Text("Unregisters the preview and thumbnail extensions, so Finder shows Markdown as plain text again. Your settings are kept.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
         }
     }
 
